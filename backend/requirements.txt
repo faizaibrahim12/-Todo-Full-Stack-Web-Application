@@ -9,3 +9,7 @@ pytest>=7.0.0
 httpx>=0.24.0
 pydantic-settings>=2.0.0
 email-validator>=2.0.0
+openai>=1.0.0
+# For AI Chatbot (optional - use Ollama for free local inference)
+openai-agents>=0.0.1  # Optional: for advanced agent features
+mcp>=1.0.0            # Optional: MCP server for tools

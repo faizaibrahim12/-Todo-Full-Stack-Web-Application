@@ -83,13 +83,13 @@ export function useTasks(userId: string | null) {
   );
 
   const toggleTaskComplete = useCallback(
-    async (taskId: string) => {
+    async (taskId: string): Promise<void> => {
       if (!userId) return;
 
       const task = tasks.find((t) => t.id === taskId);
       if (!task) return;
 
-      return updateTask(taskId, { completed: !task.completed });
+      await updateTask(taskId, { completed: !task.completed });
     },
     [userId, tasks, updateTask]
   );
@@ -103,6 +103,7 @@ export function useTasks(userId: string | null) {
     isLoading,
     error,
     fetchTasks,
+    refreshTasks: fetchTasks,
     createTask,
     updateTask,
     deleteTask,

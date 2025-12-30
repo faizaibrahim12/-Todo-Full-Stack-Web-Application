@@ -2,7 +2,7 @@
 
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { useTasks } from '@/hooks/useTasks';
@@ -10,6 +10,7 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { AddTaskForm } from '@/components/tasks/AddTaskForm';
 import { TaskList } from '@/components/tasks/TaskList';
+import ChatPanel from '@/components/chat/ChatPanel';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -21,7 +22,9 @@ export default function DashboardPage() {
     createTask,
     toggleTaskComplete,
     deleteTask,
+    refreshTasks,
   } = useTasks(user?.id || null);
+  const [showChat, setShowChat] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -36,6 +39,10 @@ export default function DashboardPage() {
   const handleLogout = async () => {
     await logout();
     router.push('/login');
+  };
+
+  const handleTaskChange = () => {
+    refreshTasks();
   };
 
   if (authLoading) {
@@ -56,46 +63,66 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white shadow-sm">
-        <div className="max-w-4xl mx-auto px-4 py-4 sm:px-6 lg:px-8">
+        <div className="max-w-6xl mx-auto px-4 py-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold text-gray-900">My Tasks</h1>
               <p className="text-sm text-gray-600 mt-1">{user?.email}</p>
             </div>
-            <Button variant="secondary" onClick={handleLogout}>
-              Log Out
-            </Button>
+            <div className="flex items-center gap-3">
+              <Button
+                variant={showChat ? 'primary' : 'secondary'}
+                onClick={() => setShowChat(!showChat)}
+              >
+                {showChat ? 'Hide Chat' : 'AI Chat'}
+              </Button>
+              <Button variant="secondary" onClick={handleLogout}>
+                Log Out
+              </Button>
+            </div>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="max-w-4xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
-        <Card>
-          <AddTaskForm onAddTask={handleAddTask} />
+      <main className="max-w-6xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Tasks Column */}
+          <div className="order-2 lg:order-1">
+            <Card>
+              <AddTaskForm onAddTask={handleAddTask} />
 
-          {error && (
-            <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-              {error}
+              {error && (
+                <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+                  {error}
+                </div>
+              )}
+
+              <TaskList
+                tasks={tasks}
+                isLoading={tasksLoading}
+                onToggle={toggleTaskComplete}
+                onDelete={deleteTask}
+              />
+            </Card>
+
+            {/* Stats */}
+            <div className="mt-6 text-center text-sm text-gray-500">
+              {tasks.length > 0 && (
+                <p>
+                  {tasks.filter((t) => t.completed).length} of {tasks.length} tasks
+                  completed
+                </p>
+              )}
             </div>
-          )}
+          </div>
 
-          <TaskList
-            tasks={tasks}
-            isLoading={tasksLoading}
-            onToggle={toggleTaskComplete}
-            onDelete={deleteTask}
-          />
-        </Card>
-
-        {/* Stats */}
-        <div className="mt-6 text-center text-sm text-gray-500">
-          {tasks.length > 0 && (
-            <p>
-              {tasks.filter((t) => t.completed).length} of {tasks.length} tasks
-              completed
-            </p>
-          )}
+          {/* Chat Column */}
+          <div className={`order-1 lg:order-2 ${showChat ? 'block' : 'hidden lg:block'}`}>
+            <div className="h-[600px]">
+              <ChatPanel onTaskChange={handleTaskChange} />
+            </div>
+          </div>
         </div>
       </main>
     </div>
