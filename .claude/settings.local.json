@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(.venv/Scripts/python.exe main.py)",
+      "Bash(openssl rand:*)",
+      "Bash(taskkill:*)",
+      "Bash(powershell.exe -Command \"cd ''D:\\\\Hackathon-Phase2\\\\backend''; uv pip sync .venv\\\\pip.txt 2>&1 || uv pip install -e . 2>&1\")",
+      "Bash(curl:*)",
+      "Bash(powershell.exe -Command \"cd ''D:\\\\Hackathon-Phase2\\\\backend''; .venv\\\\Scripts\\\\python.exe main.py\")",
+      "Bash(powershell.exe -Command \"cd ''D:\\\\Hackathon-Phase2\\\\backend''; & ''D:\\\\Hackathon-Phase2\\\\backend\\\\.venv\\\\Scripts\\\\python.exe'' check_db.py 2>&1\")",
+      "Bash(powershell.exe -Command \"Start-Sleep -Seconds 4; Invoke-WebRequest -Uri http://localhost:8000/health -UseBasicParsing 2>&1 | Select-Object -ExpandProperty Content\")"
+    ]
+  }
+}

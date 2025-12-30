@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "@better-auth/cli": "^1.4.9"
+  }
+}
