@@ -35,7 +35,7 @@ async def list_tasks(
     tasks = session.exec(statement).all()
 
     return TaskListResponse(
-        tasks=[TaskResponse.from_orm(task) for task in tasks], count=len(tasks)
+        tasks=[TaskResponse.model_validate(task) for task in tasks], count=len(tasks)
     )
 
 
@@ -63,7 +63,7 @@ async def create_task(
     session.commit()
     session.refresh(new_task)
 
-    return TaskResponse.from_orm(new_task)
+    return TaskResponse.model_validate(new_task)
 
 
 @router.patch("/{task_id}", response_model=TaskResponse)
@@ -104,7 +104,7 @@ async def update_task(
     session.commit()
     session.refresh(task)
 
-    return TaskResponse.from_orm(task)
+    return TaskResponse.model_validate(task)
 
 
 @router.delete("/{task_id}", status_code=204)

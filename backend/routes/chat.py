@@ -9,66 +9,25 @@ from typing import List, Optional
 import os
 
 from database import get_session
-from models import Conversation, Message, MessageRole, Task
+from models import Conversation, Message
 from schemas import ChatRequest, ChatResponse, ChatAction
 from middleware.auth import get_current_user, verify_user_access
 from utils.exceptions import NotFoundError
 
-# OpenAI Agents SDK imports
-from agents import Agent, function_tool
-from openai import OpenAI
+# Import TodoAgent from todo_agent.py
+from todo_agent import (
+    get_agent,
+    get_openai_client,
+    get_provider_name,
+    is_llm_configured,
+    add_task_tool,
+    list_tasks_tool,
+    complete_task_tool,
+    delete_task_tool,
+    update_task_tool,
+)
 
 router = APIRouter(prefix="/api", tags=["Chat"])
-
-# Configuration: Use OLLAMA_BASE_URL for local/free, or OPENAI_API_KEY for OpenAI
-_ollama_base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1")
-_openai_api_key = os.getenv("OPENAI_API_KEY", "not-needed-for-ollama")
-
-# Initialize OpenAI client (lazy initialization)
-_openai_client: Optional[OpenAI] = None
-
-def get_openai_client() -> Optional[OpenAI]:
-    """Get or create OpenAI/Ollama client."""
-    global _openai_client
-    if _openai_client is None:
-        base_url = os.getenv("OLLAMA_BASE_URL")
-        api_key = os.getenv("OPENAI_API_KEY", "ollama")
-
-        if base_url:
-            # Use Ollama (local/free)
-            _openai_client = OpenAI(base_url=base_url, api_key=api_key)
-        elif os.getenv("OPENAI_API_KEY"):
-            # Use OpenAI (paid)
-            _openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-
-    return _openai_client
-
-def get_provider_name() -> str:
-    """Return the LLM provider name for display."""
-    if os.getenv("OLLAMA_BASE_URL"):
-        return "Ollama (Local)"
-    elif os.getenv("OPENAI_API_KEY"):
-        return "OpenAI"
-    return "None"
-
-
-# System prompt for the agent
-SYSTEM_PROMPT = """You are a helpful todo list assistant. You help users manage their tasks through natural conversation.
-
-Your capabilities:
-- Add tasks to the user's todo list
-- List the user's current tasks
-- Mark tasks as complete
-- Delete tasks
-- Update task titles or completion status
-
-When the user wants to manage tasks:
-- Use natural language to understand their intent
-- Confirm actions before executing them when uncertain
-- Provide clear feedback about what was done
-- Be friendly and conversational
-
-Keep responses concise but helpful. If the user asks about something outside task management, politely redirect them."""
 
 
 def _get_or_create_conversation(session: Session, user_id: UUID, conversation_id: Optional[UUID] = None) -> Conversation:
@@ -115,127 +74,6 @@ def _save_message(session: Session, conversation_id: UUID, role: str, content: s
     session.commit()
     session.refresh(message)
     return message
-
-
-# Create agent tools that wrap MCP tool logic
-@function_tool
-def add_task_tool(title: str, user_id: str) -> str:
-    """Add a new task to the user's todo list."""
-    session = next(get_session())
-    try:
-        task = Task(title=title, user_id=UUID(user_id), completed=False)
-        session.add(task)
-        session.commit()
-        session.refresh(task)
-        return f"Task created successfully: '{task.title}' (ID: {task.id})"
-    finally:
-        session.close()
-
-
-@function_tool
-def list_tasks_tool(user_id: str, completed: Optional[bool] = None) -> str:
-    """List the user's tasks, optionally filtered by completion status."""
-    session = next(get_session())
-    try:
-        query = session.query(Task).filter(Task.user_id == UUID(user_id))
-        if completed is not None:
-            query = query.filter(Task.completed == completed)
-
-        tasks = query.order_by(Task.created_at.desc()).all()
-
-        if not tasks:
-            return "You have no tasks."
-
-        task_list = []
-        for t in tasks:
-            status = "[x]" if t.completed else "[ ]"
-            task_list.append(f"{status} {t.title} (ID: {t.id})")
-
-        return f"You have {len(tasks)} task(s):\n" + "\n".join(task_list)
-    finally:
-        session.close()
-
-
-@function_tool
-def complete_task_tool(task_id: str, user_id: str) -> str:
-    """Mark a task as completed."""
-    session = next(get_session())
-    try:
-        task = session.get(Task, UUID(task_id))
-        if not task:
-            return f"Task not found: {task_id}"
-        if task.user_id != UUID(user_id):
-            return "Access denied"
-
-        task.completed = True
-        session.commit()
-        return f"Task marked as complete: '{task.title}'"
-    finally:
-        session.close()
-
-
-@function_tool
-def delete_task_tool(task_id: str, user_id: str) -> str:
-    """Delete a task from the user's todo list."""
-    session = next(get_session())
-    try:
-        task = session.get(Task, UUID(task_id))
-        if not task:
-            return f"Task not found: {task_id}"
-        if task.user_id != UUID(user_id):
-            return "Access denied"
-
-        title = task.title
-        session.delete(task)
-        session.commit()
-        return f"Task deleted: '{title}'"
-    finally:
-        session.close()
-
-
-@function_tool
-def update_task_tool(task_id: str, user_id: str, title: Optional[str] = None, completed: Optional[bool] = None) -> str:
-    """Update a task's properties."""
-    session = next(get_session())
-    try:
-        task = session.get(Task, UUID(task_id))
-        if not task:
-            return f"Task not found: {task_id}"
-        if task.user_id != UUID(user_id):
-            return "Access denied"
-
-        changes = []
-        if title is not None:
-            task.title = title
-            changes.append(f"title to '{title}'")
-        if completed is not None:
-            task.completed = completed
-            status = "complete" if completed else "incomplete"
-            changes.append(f"status to {status}")
-
-        session.commit()
-
-        if changes:
-            return f"Task updated: changed {', '.join(changes)}"
-        return "No changes specified"
-    finally:
-        session.close()
-
-
-# Create the agent with tools (lazy initialization)
-_agent: Optional[Agent] = None
-
-def get_agent() -> Optional[Agent]:
-    """Get or create the agent, returns None if OpenAI is not configured."""
-    global _agent
-    if _agent is None:
-        if get_openai_client():
-            _agent = Agent(
-                name="Todo Assistant",
-                instructions=SYSTEM_PROMPT,
-                tools=[add_task_tool, list_tasks_tool, complete_task_tool, delete_task_tool, update_task_tool]
-            )
-    return _agent
 
 
 @router.get("/health/llm")

@@ -1,8 +1,9 @@
 """
 FastAPI application entry point for Todo App.
+
 """
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.cors import CORSMiddleware  # sirf ek baar
 from contextlib import asynccontextmanager
 from database import create_db_and_tables
 from routes import auth_router, tasks_router, chat_router
@@ -14,24 +15,22 @@ async def lifespan(app: FastAPI):
     Lifespan context manager for app startup and shutdown.
     Creates database tables on startup.
     """
-    # Startup: Create database tables
     create_db_and_tables()
     yield
-    # Shutdown: cleanup if needed
 
 
 # Initialize FastAPI app
 app = FastAPI(
     title="Todo App API",
-    description="Multi-user todo application with JWT authentication",
+    description="Multi-user todo application with JWT authentication and AI Chatbot",
     version="1.0.0",
     lifespan=lifespan,
 )
 
-# Configure CORS
+# CORS Configuration - Frontend se calls allow karne ke liye
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:3002"],  # Frontend origins
+    allow_origins=["http://localhost:3000"],  # Next.js frontend
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -53,7 +52,8 @@ async def health_check():
 async def root():
     """Root endpoint with API information."""
     return {
-        "message": "Todo App API",
+        "message": "Todo App API - Phase 3 with AI Chatbot",
         "docs": "/docs",
         "health": "/health",
+        "chat": "/api/{user_id}/chat",
     }

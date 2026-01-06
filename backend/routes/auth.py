@@ -45,21 +45,47 @@ async def signup(user_data: UserCreate, session: Session = Depends(get_session))
         )
 
     # Hash password and create user
-    logger.info("Hashing password...")
-    hashed_password = hash_password(user_data.password)
-    logger.info("Creating new user...")
-    new_user = User(email=user_data.email, password_hash=hashed_password)
+    try:
+        logger.info("Hashing password...")
+        hashed_password = hash_password(user_data.password)
+        logger.info("Creating new user...")
+        new_user = User(email=user_data.email, password_hash=hashed_password)
 
-    session.add(new_user)
-    session.commit()
-    session.refresh(new_user)
-    logger.info(f"User created with ID: {new_user.id}")
+        session.add(new_user)
+        session.commit()
+        session.refresh(new_user)
+        logger.info(f"User created with ID: {new_user.id}")
 
-    # Generate JWT token
-    logger.info("Generating JWT token...")
-    token = create_access_token(new_user.id)
+        # Generate JWT token
+        logger.info("Generating JWT token...")
+        token = create_access_token(new_user.id)
+        logger.info("JWT token generated successfully")
 
-    return AuthResponse(user=UserResponse.from_orm(new_user), token=token)
+        # Create UserResponse from SQLModel instance
+        user_response = UserResponse(
+            id=new_user.id,
+            email=new_user.email,
+            created_at=new_user.created_at
+        )
+        logger.info("UserResponse created successfully")
+        
+        response = AuthResponse(user=user_response, token=token)
+        logger.info("AuthResponse created, returning...")
+        return response
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        session.rollback()
+        raise
+    except Exception as e:
+        logger.error(f"Error during signup: {type(e).__name__}: {e}", exc_info=True)
+        session.rollback()
+        # Return more detailed error for debugging
+        error_msg = f"Signup failed: {type(e).__name__}: {str(e)}"
+        logger.error(error_msg)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=error_msg
+        )
 
 
 @router.post("/login", response_model=AuthResponse)
@@ -91,7 +117,14 @@ async def login(credentials: UserLogin, session: Session = Depends(get_session))
     # Generate JWT token
     token = create_access_token(user.id)
 
-    return AuthResponse(user=UserResponse.from_orm(user), token=token)
+    # Create UserResponse from SQLModel instance
+    user_response = UserResponse(
+        id=user.id,
+        email=user.email,
+        created_at=user.created_at
+    )
+    
+    return AuthResponse(user=user_response, token=token)
 
 
 @router.post("/logout")

@@ -1,5 +1,3 @@
-// T045: Login form component with validation
-
 'use client';
 
 import { useState } from 'react';
